@@ -9,7 +9,13 @@ import useSWR from "swr";
 
 import { CURRENCY } from "../lib/env";
 import { API_URL } from "../lib/env";
-import { fetcher, satoshisToSatcomma, trimPubkey } from "../lib/utils";
+import {
+  decodeInvoice,
+  fetcher,
+  isInvoice,
+  satoshisToSatcomma,
+  trimLongString,
+} from "../lib/utils";
 import Error from "./Error";
 import Header from "./Header";
 import { LoadingSpinnerFullscreen } from "./LoadingSpinner";
@@ -34,7 +40,7 @@ function SearchResult({ nodeInfo }: { nodeInfo: NodeInfo }) {
         <Card className="cursor-pointer shadow-none hover:shadow-sm shadow-yellow-500/50 transition duration-300">
           <CardHeader>
             <CardTitle>{nodeInfo.alias}</CardTitle>
-            <CardDescription>{trimPubkey(nodeInfo.id)}</CardDescription>
+            <CardDescription>{trimLongString(nodeInfo.id)}</CardDescription>
             <CardDescription>
               {channels.data !== undefined ? (
                 <>
@@ -66,6 +72,31 @@ export default function Search() {
     `${API_URL}/v2/lightning/${CURRENCY}/search?${new URLSearchParams({
       alias: query!,
     })}`,
+    async (url: string) => {
+      const invoiceType = isInvoice(query!);
+      if (invoiceType !== undefined) {
+        const pubkeys = await decodeInvoice(invoiceType, query!);
+        const nodes = await Promise.allSettled(
+          pubkeys.map(async (pubkey) => {
+            return await fetcher<NodeInfo>(
+              `${API_URL}/v2/lightning/${CURRENCY}/node/${pubkey}`,
+            );
+          }),
+        );
+        if (nodes.every((node) => node.status === "rejected")) {
+          throw nodes.map((node) => node.reason).join(", ");
+        }
+
+        return nodes
+          .filter(
+            (node): node is PromiseFulfilledResult<NodeInfo> =>
+              node.status === "fulfilled",
+          )
+          .map((node) => node.value);
+      }
+
+      return await fetcher<NodeInfo[]>(url);
+    },
   );
 
   if (nodeInfo.error) return <Error error={nodeInfo.error} />;
@@ -79,7 +110,7 @@ export default function Search() {
       <div className="flex flex-col items-center justify-center">
         <h1>Search result</h1>
         <p>
-          {nodeInfo.data!.length} results found for "{query}"
+          {nodeInfo.data!.length} results found for "{trimLongString(query!)}"
         </p>
         <div className="w-full max-w-xl">
           {nodeInfo.data!.map((node) => (
