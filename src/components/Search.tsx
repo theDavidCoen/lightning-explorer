@@ -12,7 +12,7 @@ import { API_URL } from "../lib/env";
 import { trimPubkey } from "../lib/utils";
 import Error from "./Error";
 import Header from "./Header";
-import { LoadingSpinnerFullscreen } from "./LoadingSpinnter";
+import { LoadingSpinnerFullscreen } from "./LoadingSpinner";
 import type { NodeInfo } from "./Node";
 
 function SearchResult({ nodeInfo }: { nodeInfo: NodeInfo }) {

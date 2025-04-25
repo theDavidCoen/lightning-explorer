@@ -23,6 +23,7 @@ function Landing() {
         <div className="flex flex-col items-center justify-center h-screen gap-4 max-w-2xl mx-auto">
           <h1 className="text-4xl font-bold">Lightning Explorer</h1>
           <Input
+            autoFocus
             onChange={(e) => setSearch(e.target.value)}
             onKeyDown={(e) => {
               if (e.key === "Enter") {

@@ -6,6 +6,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { useMemo } from "react";
 import { NavLink, useParams } from "react-router";
 import useSWR from "swr";
 
@@ -13,7 +14,7 @@ import { API_URL, CURRENCY } from "../lib/env";
 import { satoshisToSatcomma } from "../lib/utils";
 import Error from "./Error";
 import Header from "./Header";
-import LoadingSpinnter, { LoadingSpinnerFullscreen } from "./LoadingSpinnter";
+import LoadingSpinnter, { LoadingSpinnerFullscreen } from "./LoadingSpinner";
 
 export type NodeInfo = {
   alias: string;
@@ -40,15 +41,49 @@ type Channel = {
 };
 
 function Channels({ channels }: { channels: Channel[] }) {
+  const averagePpm = useMemo(() => {
+    return (
+      channels.reduce((acc, channel) => acc + channel.info.feePpm, 0) /
+      channels.length
+    ).toFixed(2);
+  }, [channels]);
+
+  const activeChannels = useMemo(() => {
+    return channels.filter((channel) => channel.active);
+  }, [channels]);
+
+  const adjustedPpm = useMemo(() => {
+    return (
+      activeChannels.reduce(
+        (acc, channel) => acc + channel.info.feePpm * channel.capacity,
+        0,
+      ) / activeChannels.reduce((acc, channel) => acc + channel.capacity, 0) ||
+      0
+    ).toFixed(2);
+  }, [activeChannels]);
+
   return (
     <>
-      <h2>Channels: {channels.length}</h2>
-      <h2>
-        Capacity:{" "}
-        {satoshisToSatcomma(
-          channels.reduce((acc, channel) => acc + channel.capacity, 0),
-        )}
-      </h2>
+      <div className="flex flex-row justify-between gap-4 mt-4">
+        <h2>
+          Capacity:{" "}
+          {satoshisToSatcomma(
+            channels.reduce((acc, channel) => acc + channel.capacity, 0),
+          )}
+        </h2>
+      </div>
+      <div className="flex flex-row justify-between gap-4 mt-1">
+        <h2>Channels: {channels.length}</h2>
+        <h2>Inactive: {channels.length - activeChannels.length}</h2>
+        <h2>
+          Active: {((activeChannels.length / channels.length) * 100).toFixed(2)}
+          %
+        </h2>
+      </div>
+      <div className="flex flex-row justify-between gap-4 mt-1">
+        <h2>Adjusted PPM: {adjustedPpm}</h2>
+        <h2>Average PPM: {averagePpm}</h2>
+      </div>
 
       <hr />
 
@@ -64,7 +99,10 @@ function Channels({ channels }: { channels: Channel[] }) {
           </TableHeader>
           <TableBody>
             {channels.map((channel) => (
-              <TableRow>
+              <TableRow
+                className={`hover:bg-muted/50 transition duration-150 ${
+                  !channel.active ? "bg-yellow-500/5" : ""
+                }`}>
                 <TableCell className="font-medium">
                   {channel.shortChannelId}
                 </TableCell>
@@ -116,7 +154,9 @@ function Node() {
             <LoadingSpinnter />
           </div>
         ) : (
-          <Channels channels={channels.data!} />
+          <Channels
+            channels={channels.data!.sort((a, b) => b.capacity - a.capacity)}
+          />
         )}
       </div>
     </>
