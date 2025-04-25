@@ -22,7 +22,7 @@ export type NodeInfo = {
   id: string;
 };
 
-type Channel = {
+export type Channel = {
   source: {
     id: string;
     alias: string;

@@ -13,7 +13,7 @@ import "./index.css";
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <ThemeProvider defaultTheme="dark" storageKey="ui-theme">
-      <SWRConfig value={{ fetcher }}>
+      <SWRConfig value={{ fetcher, errorRetryCount: 0 }}>
         <BrowserRouter>
           <Routes>
             <Route index path="/" element={<App />} />

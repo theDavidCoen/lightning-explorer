@@ -20,7 +20,7 @@ function Landing() {
   return (
     <>
       <div className="m-8">
-        <div className="flex flex-col items-center justify-center h-screen gap-4 max-w-2xl mx-auto">
+        <div className="flex flex-col items-center justify-center gap-4 max-w-2xl mx-auto h-[calc(100vh-4rem)] my-auto">
           <h1 className="text-4xl font-bold">Lightning Explorer</h1>
           <Input
             autoFocus

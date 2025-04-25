@@ -9,13 +9,25 @@ import useSWR from "swr";
 
 import { CURRENCY } from "../lib/env";
 import { API_URL } from "../lib/env";
-import { trimPubkey } from "../lib/utils";
+import { fetcher, satoshisToSatcomma, trimPubkey } from "../lib/utils";
 import Error from "./Error";
 import Header from "./Header";
 import { LoadingSpinnerFullscreen } from "./LoadingSpinner";
-import type { NodeInfo } from "./Node";
+import type { Channel, NodeInfo } from "./Node";
 
 function SearchResult({ nodeInfo }: { nodeInfo: NodeInfo }) {
+  const channels = useSWR<Channel[]>(
+    `${API_URL}/v2/lightning/${CURRENCY}/channels/${nodeInfo.id}`,
+    async (url: string) => {
+      try {
+        return await fetcher<Channel[]>(url);
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      } catch (error) {
+        return [];
+      }
+    },
+  );
+
   return (
     <div className="mt-4">
       <Link to={`/node/${nodeInfo.id}`}>
@@ -23,6 +35,24 @@ function SearchResult({ nodeInfo }: { nodeInfo: NodeInfo }) {
           <CardHeader>
             <CardTitle>{nodeInfo.alias}</CardTitle>
             <CardDescription>{trimPubkey(nodeInfo.id)}</CardDescription>
+            <CardDescription>
+              {channels.data !== undefined ? (
+                <>
+                  <p>Channels: {channels.data.length}</p>
+                  <p>
+                    Capacity:{" "}
+                    {satoshisToSatcomma(
+                      channels.data.reduce(
+                        (acc, channel) => acc + channel.capacity,
+                        0,
+                      ),
+                    )}
+                  </p>
+                </>
+              ) : (
+                <p>Loading...</p>
+              )}
+            </CardDescription>
           </CardHeader>
         </Card>
       </Link>
