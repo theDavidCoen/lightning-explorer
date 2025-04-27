@@ -5,10 +5,16 @@ const decimals = 8;
 const satFactor = 100_000_000;
 
 export const enum InvoiceType {
-  Bolt11,
-  Offer,
-  Bolt12,
+  Bolt11 = "BOLT11",
+  Offer = "BOLT12 offer",
+  Bolt12 = "BOLT12 invoice",
 }
+
+export type DecodedInvoice = {
+  invoiceType: InvoiceType;
+  pubkeys: string[];
+  invoiceAmountSat?: number;
+};
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -64,8 +70,8 @@ export const isInvoice = (invoice: string): InvoiceType | undefined => {
 export const decodeInvoice = async (
   invoiceType: InvoiceType,
   invoice: string,
-): Promise<string[]> => {
-  let res: string[] = [];
+): Promise<DecodedInvoice> => {
+  let res: DecodedInvoice;
 
   switch (invoiceType) {
     case InvoiceType.Bolt11:
@@ -79,32 +85,45 @@ export const decodeInvoice = async (
       break;
   }
 
-  // Deduplicate the pubkeys in the result
-  return [...new Set(res)];
+  return {
+    invoiceType,
+    // Deduplicate the pubkeys in the result
+    pubkeys: [...new Set(res.pubkeys)],
+    invoiceAmountSat: res.invoiceAmountSat,
+  };
 };
 
-export const decodeBolt11 = async (invoice: string) => {
+export const decodeBolt11 = async (
+  invoice: string,
+): Promise<DecodedInvoice> => {
   const bolt11 = await import("@atomiqlabs/bolt11");
   const decoded = bolt11.decode(invoice);
 
-  return [
-    decoded.payeeNodeKey,
-    ...(decoded.tagsObject.routing_info?.map((r) => r.pubkey) ?? []),
-  ].filter((p): p is string => p !== undefined);
+  return {
+    invoiceType: InvoiceType.Bolt11,
+    invoiceAmountSat: decoded.satoshis ?? undefined,
+    pubkeys: [
+      decoded.payeeNodeKey,
+      ...(decoded.tagsObject.routing_info?.map((r) => r.pubkey) ?? []),
+    ].filter((p): p is string => p !== undefined),
+  };
 };
 
-export const decodeOffer = async (invoice: string) => {
+export const decodeOffer = async (invoice: string): Promise<DecodedInvoice> => {
   const { Offer } = await import("boltz-bolt12");
 
   const decoded = new Offer(invoice);
 
   try {
-    return [
-      decoded.signing_pubkey,
-      ...decoded.paths.map((path) => path.introduction_node),
-    ]
-      .filter((p) => p !== undefined)
-      .map((p) => Buffer.from(p).toString("hex"));
+    return {
+      invoiceType: InvoiceType.Offer,
+      pubkeys: [
+        decoded.signing_pubkey,
+        ...decoded.paths.map((path) => path.introduction_node),
+      ]
+        .filter((p) => p !== undefined)
+        .map((p) => Buffer.from(p).toString("hex")),
+    };
   } finally {
     decoded.free();
   }
@@ -115,13 +134,17 @@ export const decodeBolt12 = async (invoice: string) => {
   const decoded = new Invoice(invoice);
 
   try {
-    return [
-      decoded.signing_pubkey,
-      ...decoded.payment_paths.map((path) => path.introduction_node),
-      ...decoded.message_paths.map((path) => path.introduction_node),
-    ]
-      .filter((p) => p !== undefined)
-      .map((p) => Buffer.from(p).toString("hex"));
+    return {
+      invoiceType: InvoiceType.Bolt12,
+      invoiceAmountSat: Number(decoded.amount_msat / 1_000n),
+      pubkeys: [
+        decoded.signing_pubkey,
+        ...decoded.payment_paths.map((path) => path.introduction_node),
+        ...decoded.message_paths.map((path) => path.introduction_node),
+      ]
+        .filter((p) => p !== undefined)
+        .map((p) => Buffer.from(p).toString("hex")),
+    };
   } finally {
     decoded.free();
   }

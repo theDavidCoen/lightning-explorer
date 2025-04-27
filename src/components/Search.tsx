@@ -4,12 +4,14 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { useState } from "react";
 import { Link, useParams } from "react-router";
 import useSWR from "swr";
 
 import { CURRENCY } from "../lib/env";
 import { API_URL } from "../lib/env";
 import {
+  DecodedInvoice,
   decodeInvoice,
   fetcher,
   isInvoice,
@@ -66,8 +68,22 @@ function SearchResult({ nodeInfo }: { nodeInfo: NodeInfo }) {
   );
 }
 
+function InvoiceInfo({ decoded }: { decoded: DecodedInvoice }) {
+  return (
+    <div className="flex flex-row justify-between gap-4 mt-1">
+      <p>Invoice type: {decoded.invoiceType}</p>
+      {decoded.invoiceAmountSat && (
+        <p>Amount: {satoshisToSatcomma(decoded.invoiceAmountSat)}</p>
+      )}
+    </div>
+  );
+}
+
 export default function Search() {
   const { query } = useParams();
+  const [decodedInvoice, setDecodedInvoice] = useState<
+    DecodedInvoice | undefined
+  >(undefined);
   const nodeInfo = useSWR<NodeInfo[]>(
     `${API_URL}/v2/lightning/${CURRENCY}/search?${new URLSearchParams({
       alias: query!,
@@ -75,9 +91,10 @@ export default function Search() {
     async (url: string) => {
       const invoiceType = isInvoice(query!);
       if (invoiceType !== undefined) {
-        const pubkeys = await decodeInvoice(invoiceType, query!);
+        const decoded = await decodeInvoice(invoiceType, query!);
+        setDecodedInvoice(decoded);
         const nodes = await Promise.allSettled(
-          pubkeys.map(async (pubkey) => {
+          decoded.pubkeys.map(async (pubkey) => {
             return await fetcher<NodeInfo>(
               `${API_URL}/v2/lightning/${CURRENCY}/node/${pubkey}`,
             );
@@ -112,6 +129,7 @@ export default function Search() {
         <p>
           {nodeInfo.data!.length} results found for "{trimLongString(query!)}"
         </p>
+        {decodedInvoice && <InvoiceInfo decoded={decodedInvoice} />}
         <div className="w-full max-w-xl">
           {nodeInfo.data!.map((node) => (
             <SearchResult key={node.id} nodeInfo={node} />
