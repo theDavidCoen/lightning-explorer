@@ -46,9 +46,11 @@ export const isPubkey = (pubkey: string) => {
 };
 
 export const isChannelId = (channelId: string) => {
-  return channelId.includes("x") || !isNaN(Number(channelId));
+  return (
+    (channelId.split("x").length === 3 && channelId.length < 15) ||
+    !isNaN(Number(channelId))
+  );
 };
-
 export const trimLongString = (str: string) => {
   if (str.length < 23) {
     return str;
