@@ -3,7 +3,7 @@ import { Input } from "@/components/ui/input";
 import { useState } from "react";
 import { useNavigate } from "react-router";
 
-import { isPubkey } from "../lib/utils";
+import { isChannelId, isPubkey } from "../lib/utils";
 
 function Landing() {
   const navigate = useNavigate();
@@ -12,6 +12,8 @@ function Landing() {
   const execute = () => {
     if (isPubkey(search)) {
       navigate(`/node/${search}`);
+    } else if (isChannelId(search)) {
+      navigate(`/channel/${search}`);
     } else {
       navigate(`/search/${search}`);
     }

@@ -100,11 +100,14 @@ function Channels({ channels }: { channels: Channel[] }) {
           <TableBody>
             {channels.map((channel) => (
               <TableRow
+                key={channel.shortChannelId}
                 className={`hover:bg-muted/50 transition duration-150 ${
                   !channel.active ? "bg-yellow-500/5" : ""
                 }`}>
                 <TableCell className="font-medium">
-                  {channel.shortChannelId}
+                  <NavLink to={`/channel/${channel.shortChannelId}`}>
+                    {channel.shortChannelId}
+                  </NavLink>
                 </TableCell>
                 <TableCell className="font-medium">
                   <NavLink to={`/node/${channel.source.id}`}>
