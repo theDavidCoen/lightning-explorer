@@ -92,10 +92,12 @@ const resolveBip353 = async (bip353: string): Promise<Info> => {
 const InfoCard = ({ type, properties }: Info) => {
   const [amount, setAmount] = useState(0);
   const [invoice, setInvoice] = useState<string | undefined>(undefined);
+  const [error, setError] = useState<string | undefined>(undefined);
   const [fetching, setFetching] = useState(false);
 
   const fetchInvoice = async () => {
     setInvoice(undefined);
+    setError(undefined);
     setFetching(true);
 
     try {
@@ -109,6 +111,12 @@ const InfoCard = ({ type, properties }: Info) => {
 
           const res = await fetch(url.toString());
           const data = await res.json();
+
+          if (data.status === "ERROR") {
+            setError(data.reason);
+            return;
+          }
+
           setInvoice(data.pr);
           break;
         }
@@ -132,6 +140,9 @@ const InfoCard = ({ type, properties }: Info) => {
           setInvoice(data.invoice);
         }
       }
+    } catch (error) {
+      setError(error as string);
+      console.error("Invoice fetch error", error);
     } finally {
       setFetching(false);
     }
@@ -142,11 +153,13 @@ const InfoCard = ({ type, properties }: Info) => {
       <CardHeader>
         <CardTitle>{type}</CardTitle>
         <CardDescription>
-          {Object.entries(properties).map(([key, value]) => (
-            <p key={key}>
-              {key}: {value}
-            </p>
-          ))}
+          {Object.entries(properties)
+            .filter(([, value]) => typeof value !== "object")
+            .map(([key, value]) => (
+              <p key={key}>
+                {key}: {value}
+              </p>
+            ))}
           <div className="flex flex-row justify-center mt-4 gap-2">
             <Input
               type="number"
@@ -167,6 +180,7 @@ const InfoCard = ({ type, properties }: Info) => {
             </div>
           )}
           {invoice && <p className="mt-4">{invoice}</p>}
+          {error && <p className="mt-4 text-red-500 text-center">{error}</p>}
         </CardDescription>
       </CardHeader>
     </Card>
