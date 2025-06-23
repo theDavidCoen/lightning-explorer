@@ -3,7 +3,7 @@ import { Input } from "@/components/ui/input";
 import { useState } from "react";
 import { useNavigate } from "react-router";
 
-import { isChannelId, isPubkey } from "../lib/utils";
+import { isChannelId, isPubkey, isToBeResolved } from "../lib/utils";
 
 function Landing() {
   const navigate = useNavigate();
@@ -14,6 +14,8 @@ function Landing() {
       navigate(`/node/${search}`);
     } else if (isChannelId(search)) {
       navigate(`/channel/${search}`);
+    } else if (isToBeResolved(search)) {
+      navigate(`/resolver/${search}`);
     } else {
       navigate(`/search/${search}`);
     }

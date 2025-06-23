@@ -116,7 +116,9 @@ export default function Search() {
     },
   );
 
-  if (nodeInfo.error) return <Error error={nodeInfo.error} />;
+  if (nodeInfo.error) {
+    return <Error error={nodeInfo.error} />;
+  }
   if (nodeInfo.isLoading) {
     return <LoadingSpinnerFullscreen />;
   }

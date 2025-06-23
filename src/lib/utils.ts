@@ -51,6 +51,19 @@ export const isChannelId = (channelId: string) => {
     !isNaN(Number(channelId))
   );
 };
+
+export const isSatsAddress = (input: string) => {
+  return input.includes("@");
+};
+
+export const isLnurl = (input: string) => {
+  return input.trim().toLowerCase().startsWith("lnurl");
+};
+
+export const isToBeResolved = (input: string) => {
+  return isSatsAddress(input) || isLnurl(input);
+};
+
 export const trimLongString = (str: string) => {
   if (str.length < 23) {
     return str;
