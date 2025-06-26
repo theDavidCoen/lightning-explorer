@@ -24,8 +24,13 @@ type Info = {
 };
 
 const getLnurl = async (lnurl: string): Promise<Info> => {
-  const res = await fetch(lnurl);
+  const res = await fetch(lnurl, { redirect: "follow" }); // <-- Explicitly follow 301/302
+  if (!res.ok) {
+    throw new Error(`Failed to fetch LNURL: ${res.statusText}`);
+  }
+
   const data = await res.json();
+
 
   if (data.status === "ERROR") {
     throw "LNURL threw error";
