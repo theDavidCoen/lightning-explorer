@@ -24,13 +24,9 @@ type Info = {
 };
 
 const getLnurl = async (lnurl: string): Promise<Info> => {
-  const res = await fetch(lnurl, { redirect: "follow" }); // <-- Explicitly follow 301/302
-  if (!res.ok) {
-    throw new Error(`Failed to fetch LNURL: ${res.statusText}`);
-  }
-
+  const res = await fetch(lnurl, { redirect: "follow" });
   const data = await res.json();
-
+  console.log("LNURL fetch response:", data);
 
   if (data.status === "ERROR") {
     throw "LNURL threw error";
@@ -61,35 +57,31 @@ const resolveBip353 = async (bip353: string): Promise<Info> => {
   const res = await lookup(
     `${split[0]}.user._bitcoin-payment.${split[1]}`,
     "txt",
-    DNS_OVER_HTTPS,
+    DNS_OVER_HTTPS
   );
 
   const nowUnix = Date.now() / 1_000;
-  if (nowUnix < res.valid_from) {
-    throw "proof is not valid yet";
-  }
-  if (nowUnix > res.expires) {
-    throw "proof has expired";
-  }
+  if (nowUnix < res.valid_from) throw "proof is not valid yet";
+  if (nowUnix > res.expires) throw "proof has expired";
 
-  if (res.verified_rrs === undefined || res.verified_rrs.length === 0) {
-    throw "no TXT record";
-  }
-
-  if (res.verified_rrs[0].type !== "txt") {
+  if (!res.verified_rrs?.length || res.verified_rrs[0].type !== "txt") {
     throw "invalid proof";
   }
 
   const paymentRequest = res.verified_rrs[0].contents;
-  const offer = new URLSearchParams(paymentRequest.split("?")[1])
-    .get("lno")!
-    .replace(/"/g, "");
+  const params = new URLSearchParams(paymentRequest.split("?")[1]);
+
+  const offer = params.get("lno")?.replace(/"/g, "") ?? "";
+  const ark = params.get("ark")?.replace(/"/g, "").trim() ?? "";
 
   console.log("Resolved offer for BIP-353:", offer);
+  if (ark) console.log("Resolved ark for BIP-353:", ark);
+
   return {
     type: InfoType.BIP353,
     properties: {
-      offer: offer,
+      offer,
+      ...(ark && { ark }),
     },
   };
 };
@@ -109,10 +101,7 @@ const InfoCard = ({ type, properties }: Info) => {
       switch (type) {
         case InfoType.LNURL: {
           const url = new URL(properties.callback);
-          url.searchParams.set(
-            "amount",
-            (BigInt(amount) * BigInt(1000)).toString(),
-          );
+          url.searchParams.set("amount", (BigInt(amount) * BigInt(1000)).toString());
 
           const res = await fetch(url.toString());
           const data = await res.json();
@@ -136,9 +125,9 @@ const InfoCard = ({ type, properties }: Info) => {
               },
               body: JSON.stringify({
                 offer: properties.offer,
-                amount: amount,
+                amount,
               }),
-            },
+            }
           );
 
           const data = await res.json();
@@ -146,7 +135,7 @@ const InfoCard = ({ type, properties }: Info) => {
         }
       }
     } catch (error) {
-      setError(error as string);
+      setError((error as Error).message);
       console.error("Invoice fetch error", error);
     } finally {
       setFetching(false);
@@ -158,13 +147,14 @@ const InfoCard = ({ type, properties }: Info) => {
       <CardHeader>
         <CardTitle>{type}</CardTitle>
         <CardDescription>
-          {Object.entries(properties)
-            .filter(([, value]) => typeof value !== "object")
-            .map(([key, value]) => (
-              <p key={key}>
-                {key}: {value}
-              </p>
-            ))}
+          {Object.entries(properties).map(([key, value]) => (
+            <p key={key}>
+              {key}:{value}
+            </p>
+          ))}
+
+        
+
           <div className="flex flex-row justify-center mt-4 gap-2">
             <Input
               type="number"
@@ -179,6 +169,7 @@ const InfoCard = ({ type, properties }: Info) => {
               Fetch
             </Button>
           </div>
+
           {fetching && (
             <div className="flex flex-row justify-center mt-4">
               <LoadingSpinner />
@@ -197,15 +188,13 @@ const Resolver = () => {
   const decodedInput = input ? decodeURIComponent(input) : undefined;
 
   const info = useSWR<Info[]>(decodedInput, async () => {
-    if (decodedInput === undefined) {
-      return [];
-    }
+    if (!decodedInput) return [];
 
     const promises: Promise<Info>[] = [];
 
     if (isSatsAddress(decodedInput)) {
-      const urlsplit = decodedInput.split("@");
-      const lnurl = `https://${urlsplit[1]}/.well-known/lnurlp/${urlsplit[0]}`;
+      const [user, domain] = decodedInput.split("@");
+      const lnurl = `https://${domain}/.well-known/lnurlp/${user}`;
 
       promises.push(getLnurl(lnurl));
       promises.push(resolveBip353(decodedInput));
@@ -216,15 +205,11 @@ const Resolver = () => {
 
     return await Promise.allSettled(promises)
       .then((res) => res.filter((r) => r.status === "fulfilled"))
-      .then((res) => res.map((r) => r.value));
+      .then((res) => res.map((r) => (r as PromiseFulfilledResult<Info>).value));
   });
 
-  if (info.error) {
-    return <Error error={info.error} />;
-  }
-  if (info.isLoading) {
-    return <LoadingSpinnerFullscreen />;
-  }
+  if (info.error) return <Error error={info.error} />;
+  if (info.isLoading) return <LoadingSpinnerFullscreen />;
 
   return (
     <>
@@ -235,7 +220,7 @@ const Resolver = () => {
           {info.data!.length === 0 && <h2>No info found</h2>}
           {info.data!.map((info) => (
             <InfoCard
-              key={info.type}
+              key={info.type + JSON.stringify(info.properties)}
               type={info.type}
               properties={info.properties}
             />
